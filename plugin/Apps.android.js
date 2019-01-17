@@ -91,8 +91,13 @@ function getInstalledListOfApps(callback, cfg) {
                         console.log(logo);
                     }
                     if (logo != null) {
-                        console.log(logo);
-                        var bitmap = logo.getBitmap();
+                        var bitmap = null;
+                        if (typeof logo == "android.graphics.drawable.AdaptiveIconDrawable") {
+                            
+                        } else {
+                            bitmap = logo.getBitmap();
+                        }
+                        
                         try {
                             if (bitmap != null) {
                                 var stream = new java.io.ByteArrayOutputStream();
@@ -130,6 +135,7 @@ function getInstalledListOfApps(callback, cfg) {
                                 layerDrawable.draw(canvas);
 
                                 if (bitmap != null) {
+                                    console.log("GOT BITMAP!");
                                     var stream = new java.io.ByteArrayOutputStream();
                                     try {
                                         bitmap.compress(iconFormat, iconQuality, stream);
