@@ -27,12 +27,14 @@ var androidAppCtx = androidApp.context;
 function getInstalledListOfApps(callback, cfg) {
     var iconFormat = android.graphics.Bitmap.CompressFormat.PNG;
     var iconMime = 'image/png';
-    var iconQuality = cfg.icon.quality;
-    switch (cfg.icon.format) {
-        case 1:
-            iconFormat = android.graphics.Bitmap.CompressFormat.JPEG;
-            iconMime = 'image/jpeg';
-            break;
+    if (cfg) {
+        var iconQuality = cfg.icon.quality;
+        switch (cfg.icon.format) {
+            case 1:
+                iconFormat = android.graphics.Bitmap.CompressFormat.JPEG;
+                iconMime = 'image/jpeg';
+                break;
+        }
     }
 
     var pm = androidAppCtx.getPackageManager();
@@ -58,6 +60,9 @@ function getInstalledListOfApps(callback, cfg) {
             
             try {
                 var logo = pm.getApplicationLogo(p.applicationInfo);
+                if (logo == null) {
+                    logo = pm.getApplicationIcon(p.applicationInfo);
+                }
                 if (logo != null) {
                     var bitmap = logo.getBitmap();
                     try {
