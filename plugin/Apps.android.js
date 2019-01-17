@@ -24,6 +24,31 @@ var app = require("application");
 var androidApp = app.android;
 var androidAppCtx = androidApp.context;
 
+function isLaunchable(packageInfo) {
+    const pm = androidAppCtx.getPackageManager();
+ 
+    return pm.getLaunchIntentForPackage(packageInfo.packageName) !== null;
+};
+ 
+function isSystemApp(packageName) {
+    try {
+        const pm = androidAppCtx.getPackageManager();
+        // Get packageinfo for target application
+        const targetPkgInfo = pm.getPackageInfo(
+                packageName, 64);
+        // Get packageinfo for system package
+        const sys = pm.getPackageInfo(
+                "android", 64);
+        // Match both packageinfo for there signatures
+ 
+        return (targetPkgInfo != null && targetPkgInfo.signatures != null && sys.signatures[0]
+                .equals(targetPkgInfo.signatures[0]));
+ 
+    } catch (e) {
+        return false;
+    }
+}
+
 function getInstalledListOfApps(callback, cfg) {
     var iconFormat = android.graphics.Bitmap.CompressFormat.PNG;
     var iconMime = 'image/png';
@@ -45,59 +70,100 @@ function getInstalledListOfApps(callback, cfg) {
     for (var i = 0; i < packages.size(); i++) {
         var p = packages.get(i);
         
-        var a = {
-            displayName: pm.getApplicationLabel(p.applicationInfo).toString(),
-            name: p.packageName,
-            version: {
-                code: p.versionCode,
-                name: p.versionName
-            },
-            icon: undefined
-        };
-        
-        if (cfg.withIcons) {
-            a.icon = null;
+        if (!isSystemApp(p.packageName) && isLaunchable(p)) {
+            var a = {
+                displayName: pm.getApplicationLabel(p.applicationInfo).toString(),
+                name: p.packageName,
+                version: {
+                    code: p.versionCode,
+                    name: p.versionName
+                },
+                icon: undefined
+            };
             
-            try {
-                var logo = pm.getApplicationLogo(p.applicationInfo);
-                if (logo == null) {
-                    logo = pm.getApplicationIcon(p.applicationInfo);
-                }
-                if (logo != null) {
-                    var bitmap = logo.getBitmap();
-                    try {
-                        if (bitmap != null) {
-                            var stream = new java.io.ByteArrayOutputStream();
-                            try {
-                                bitmap.compress(iconFormat, iconQuality, stream);
-                                
-                                a.icon = "data:" + iconMime + ";base64," + android.util.Base64.encodeToString(stream.toByteArray(),
-                                                                                                              android.util.Base64.NO_WRAP);
+            if (cfg.withIcons) {
+                a.icon = null;
+                
+                try {
+                    var logo = pm.getApplicationLogo(p.applicationInfo);
+                    if (logo == null) {
+                        logo = pm.getApplicationIcon(p.applicationInfo);
+                        console.log(logo);
+                    }
+                    if (logo != null) {
+                        console.log(logo);
+                        var bitmap = logo.getBitmap();
+                        try {
+                            if (bitmap != null) {
+                                var stream = new java.io.ByteArrayOutputStream();
+                                try {
+                                    bitmap.compress(iconFormat, iconQuality, stream);
+                                    
+                                    a.icon = "data:" + iconMime + ";base64," + android.util.Base64.encodeToString(stream.toByteArray(),
+                                                                                                                android.util.Base64.NO_WRAP);
+                                }
+                                catch (e) {
+                                    // ignore
+                                }
+                                finally {
+                                    stream.close();
+                                }
+                            } else {
+                                var drawable = logo;
+                                var backgroundDr = (drawable).getBackground();
+                                var foregroundDr = (drawable).getForeground();
+
+                                var drr = new Drawable[2];
+                                drr[0] = backgroundDr;
+                                drr[1] = foregroundDr;
+
+                                var layerDrawable = new LayerDrawable(drr);
+
+                                var width = layerDrawable.getIntrinsicWidth();
+                                var height = layerDrawable.getIntrinsicHeight();
+
+                                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+
+                                var canvas = new Canvas(bitmap);
+
+                                layerDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+                                layerDrawable.draw(canvas);
+
+                                if (bitmap != null) {
+                                    var stream = new java.io.ByteArrayOutputStream();
+                                    try {
+                                        bitmap.compress(iconFormat, iconQuality, stream);
+                                        
+                                        a.icon = "data:" + iconMime + ";base64," + android.util.Base64.encodeToString(stream.toByteArray(),
+                                                                                                                    android.util.Base64.NO_WRAP);
+                                    }
+                                    catch (e) {
+                                        // ignore
+                                    }
+                                    finally {
+                                        stream.close();
+                                    }
+                                }
+
                             }
-                            catch (e) {
-                                // ignore
-                            }
-                            finally {
-                                stream.close();
+                        }
+                        catch (e) {
+                            // ignore
+                        }
+                        finally {
+                            if (bitmap != null) {
+                                bitmap.recycle();
                             }
                         }
                     }
-                    catch (e) {
-                        // ignore
-                    }
-                    finally {
-                        if (bitmap != null) {
-                            bitmap.recycle();
-                        }
-                    }
+                }
+                catch (e) {
+                    // ignore
                 }
             }
-            catch (e) {
-                // ignore
-            }
+            
+            apps.push(a);
         }
-        
-        apps.push(a);
     }
     
     callback({
